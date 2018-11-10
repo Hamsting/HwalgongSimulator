@@ -488,6 +488,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   baseMoveSpeed: 3
+  baseJumpForce: 400
+  isGround: 1
 --- !u!54 &1711449793
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -530,6 +532,7 @@ MonoBehaviour:
   camPivot: {fileID: 1153651653}
   characterCollider: {fileID: 1711449794}
   baseRotateSpeed: 50
+  baseDistanceSpeed: 2
   isInversedX: 0
   isInversedY: 0
 --- !u!1001 &1725904097
