@@ -6,6 +6,9 @@ namespace Hwalgong
 {
     public class CharacterCameraView : MonoBehaviour
     {
+        private const float CamMinDistance = 0.75f;
+        private const float CamMaxDistance = 15.0f;
+
         public Transform camPivot;
         public Collider characterCollider;
         public float baseRotateSpeed = 5.0f;
@@ -39,12 +42,15 @@ namespace Hwalgong
 
         private void Update()
         {
-            if (Input.GetMouseButtonDown(1))
-            {
-                viewEnabled = !viewEnabled;
-                Cursor.visible = !viewEnabled;
-                Cursor.lockState = (viewEnabled) ? CursorLockMode.Locked : CursorLockMode.None;
-            }
+            // if (Input.GetKey(KeyCode.LeftAlt))
+            // {
+            //     viewEnabled = !viewEnabled;
+            //     Cursor.visible = !viewEnabled;
+            //     Cursor.lockState = (viewEnabled) ? CursorLockMode.Locked : CursorLockMode.None;
+            // }
+            viewEnabled = !Input.GetKey(KeyCode.LeftAlt);
+            Cursor.visible = !viewEnabled;
+            Cursor.lockState = (viewEnabled) ? CursorLockMode.Locked : CursorLockMode.None;
 
             float mouseWheel = (viewEnabled) ? Input.GetAxis("Mouse ScrollWheel") : 0.0f;
             float mouseXAxis = (viewEnabled) ? Input.GetAxis("Mouse X") : 0.0f;
@@ -54,7 +60,7 @@ namespace Hwalgong
             if (isInversedY)
                 mouseYAxis *= -1.0f;
 
-            camDistance += baseDistanceSpeed * mouseWheel;
+            camDistance = Mathf.Clamp(camDistance + baseDistanceSpeed * -mouseWheel, CamMinDistance, CamMaxDistance);
 
             camAngle = Mathf.Clamp(camAngle - mouseYAxis * baseRotateSpeed * Time.deltaTime, -89.0f, 89.0f);
 
@@ -69,8 +75,8 @@ namespace Hwalgong
 
             Ray ray = new Ray(camPivot.position, -cam.transform.forward);
             RaycastHit hit;
-            if (Physics.Raycast(ray, out hit, camDistance, (1 << LayerMask.NameToLayer("Map"))))
-                camPos.z = -hit.distance + 0.1f;
+            if (Physics.SphereCast(ray, 0.3f, out hit, camDistance, (1 << LayerMask.NameToLayer("Map"))))
+                camPos.z = -hit.distance;
 
             cam.transform.localPosition = camPos;
         }

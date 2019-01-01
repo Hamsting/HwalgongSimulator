@@ -6,45 +6,141 @@ namespace Hwalgong
 {
     public class CharacterMovement : MonoBehaviour
     {
-        public float baseMoveSpeed = 3.0f;
-        public float baseJumpForce = 400.0f;
+        private const float YVelocityAirResistance = 0.90f;
+        private const float IsGroundMaxRayDistance = 0.03f;
+        private const float IsGroundDuration = 0.2f;
 
-        private Transform target;
-        private Rigidbody rb;
+        public CharacterController target;
+        public Animator targetAnimator;
+        public float baseMoveSpeed = 4.5f;
+        public float baseRunAcceleration = 2.25f;
+        public float baseJumpSpeed = 0.35f;
+
         [SerializeField]
-        private bool isGround = true;
-        
+        private bool isGround = false;
+        private Vector3 moveVelocity = Vector3.zero;
+        private Vector3 multiJumpVelocity = Vector3.zero;
+        private Vector3 resVelocity = Vector3.zero;
+        private float yVelocity = 0.0f;
+        private float isGroundTimer = 0.0f;
+        private float isGroundRadius = 0.0f;
+
+        public GameObject testPoopPrefab;
+        public List<GameObject> poops = new List<GameObject>();
 
 
 
         private void Awake()
         {
-            target = this.transform;
-            rb = target.GetComponent<Rigidbody>();
+            if (target == null)
+            {
+                Debug.Log("CharacterMovement::The target CharacterController is null.");
+                this.enabled = false;
+                return;
+            }
+            
+            isGroundRadius = target.radius - 0.01f;
         }
 
         private void FixedUpdate()
         {
+            UpdateIsGround();
+
             float zAxis = Input.GetAxis("Vertical");
             float xAxis = Input.GetAxis("Horizontal");
+            Vector3 localDirection = target.transform.TransformDirection(new Vector3(xAxis, 0.0f, zAxis));
+            moveVelocity = localDirection * baseMoveSpeed * Time.deltaTime;
 
-            Vector3 moveVec = new Vector3(xAxis, 0.0f, zAxis) * baseMoveSpeed * Time.deltaTime;
-            target.Translate(moveVec, Space.Self);
+            float runAxis = Input.GetAxis("Run");
+            if (runAxis > 0.0f)
+                moveVelocity *= baseRunAcceleration;
+
+            UpdateMultiJump();
+            if (!isGround)
+            {
+                yVelocity += Physics.gravity.y * (1.0f - YVelocityAirResistance) * Time.deltaTime;
+                isGroundTimer += Time.deltaTime;
+            }
+            else
+            {
+                yVelocity = 0.0f;
+                isGroundTimer = 0.0f;
+            }
             
-            Ray ray = new Ray(target.position + Vector3.up * 0.1f, Vector3.down);
-            isGround = Physics.Raycast(ray, 0.2f, (1 << LayerMask.NameToLayer("Map")));
-
-            // if (isGround)
-            //     rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
-
             if (Input.GetKeyDown(KeyCode.Space))
             {
-                rb.velocity = Vector3.zero;
-                
-                if (isGround)
-                    rb.AddForce(Vector3.up * baseJumpForce);
+                if (isGround || isGroundTimer <= IsGroundDuration)
+                {
+                    yVelocity = baseJumpSpeed;
+                    isGroundTimer = IsGroundDuration + 1.0f;
+                }
                 else
-                    rb.AddForce((target.forward + Vector3.up) * baseJumpForce);
+                {
+                    yVelocity = baseJumpSpeed;
+                    Vector3 multiJumpDirection = target.transform.right * xAxis + target.transform.forward * zAxis;
+                    multiJumpVelocity += multiJumpDirection * baseMoveSpeed * 10.5f;
+                }
+            }
+
+            resVelocity = moveVelocity + new Vector3(0.0f, yVelocity, 0.0f) + (multiJumpVelocity * Time.deltaTime);
+            target.Move(resVelocity);
+
+            UpdateAnimator();
+
+            if (Input.GetKeyDown(KeyCode.T))
+            {
+                GameObject poop = GameObject.Instantiate<GameObject>(testPoopPrefab, target.transform.position, target.transform.rotation);
+                poops.Add(poop);
+            }
+        }
+
+        private void OnGUI()
+        {
+            foreach (GameObject p in poops)
+            {
+                float dis = Vector3.Distance(target.transform.position, p.transform.position);
+                Vector3 scrnPos = Camera.main.WorldToScreenPoint(p.transform.position);
+
+                GUI.Label(new Rect(scrnPos.x - 50.0f, Screen.height - scrnPos.y - 5.0f, scrnPos.x + 50.0f, Screen.height - scrnPos.y + 5.0f), dis.ToString("F1") + "m");
+            }
+        }
+
+        private void UpdateIsGround()
+        {
+            // Ray ray = new Ray(target.transform.position, Vector3.down);
+            // isGround = Physics.Raycast(ray, IsGroundMaxRayDistance);
+            Ray ray = new Ray(target.transform.position + new Vector3(0.0f, isGroundRadius, 0.0f), Vector3.down);
+            isGround = Physics.SphereCast(ray, isGroundRadius, IsGroundMaxRayDistance);
+        }
+
+        private void UpdateAnimator()
+        {
+            if (targetAnimator == null)
+                return;
+
+            float zAxis = Input.GetAxis("Vertical");
+            float xAxis = Input.GetAxis("Horizontal");
+            Vector3 vel = new Vector3(xAxis, 0.0f, zAxis) * baseMoveSpeed;
+            
+            float runAxis = Input.GetAxis("Run");
+            if (runAxis > 0.0f)
+                vel *= baseRunAcceleration;
+
+            targetAnimator.SetFloat("XVelocity", vel.x);
+            targetAnimator.SetFloat("YVelocity", vel.y);
+            targetAnimator.SetFloat("ZVelocity", vel.z);
+        }
+
+        private void UpdateMultiJump()
+        {
+            if (isGround)
+                multiJumpVelocity = Vector3.zero;
+
+            if (multiJumpVelocity.magnitude > 0.0f)
+            {
+                multiJumpVelocity = Vector3.Lerp(multiJumpVelocity, Vector3.zero, Time.deltaTime);
+                if (multiJumpVelocity.magnitude < 0.05f)
+                    multiJumpVelocity = Vector3.zero;
             }
         }
     }
